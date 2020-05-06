@@ -1,3 +1,10 @@
+"""
+========================================================================================
+========== THIS SCRIPT IS FOR TRAINING THE NETWORK IN THE BEAUTY CONTEST GAME ==========
+========================================================================================
+"""
+
+
 from scipy.stats import gaussian_kde
 import numpy as np
 from scipy.stats import rv_continuous, kstest, gaussian_kde, norm
@@ -50,7 +57,6 @@ for player_data in updated_bcg_data[1:]:
 # Make lists of first round responses for each p-value
 first_round_responses_0_7 = []
 first_round_responses_0_9 = []
-print(updated_bcg_data[:3])
 for i in range(1, 1961, 10):
     p_value = updated_bcg_data[i][0]
     first_round_response = float(updated_bcg_data[i][-4])
@@ -173,11 +179,14 @@ class fictitious_player_bcg():
 
 # Create one million fictitious players in the beauty pageant game and store them to a container list
 bcg_players_0_7 = []
+bcg_players_0_9 = []
 number_of_players = 1000
 start = time.time()
 for i in range(number_of_players):
-    bcg_player = fictitious_player_bcg(0.7)
-    bcg_players_0_7.append(bcg_player)
+    bcg_player_7 = fictitious_player_bcg(0.7)
+    bcg_player_9 = fictitious_player_bcg(0.9)
+    bcg_players_0_7.append(bcg_player_7)
+    bcg_players_0_9.append(bcg_player_9)
     if (i + 1) % 50 == 0:
         elapsed = time.time() - start
         estimated_remaining = round((((elapsed / (i + 1)) * (number_of_players) - elapsed) / 60), 2)
@@ -268,6 +277,19 @@ def get_error(scores, labels):
     num_matches = indicator.sum().item()
     return 1 - (num_matches / bs)
 
+# Define function to count number of parameters in network
+def count_parameters(model):
+    """
+    Function to count the trainable parameters in a neural network.
+    """
+    count = 0
+    for parameter in list(model.parameters()):
+        subcount = 1
+        for size in list(parameter.size()):
+            subcount *= size
+        count += subcount
+    return count
+
 def int_to_normal_tensor(index, output_length = 101, sd = 5):
     """
     This function will take an integer (called index) as input and return a
@@ -303,29 +325,6 @@ def int_to_normal_tensor(index, output_length = 101, sd = 5):
     output = torch.Tensor(normal_dist.pdf(output))
     zero_indices = output < 0.05
     output[zero_indices] = 0
-    #
-    # if (index - 5 > 0) and (index + 5 < 100):
-    #     leading_zeros = torch.zeros(index - 5)
-    #     trailing_zeros = torch.zeros(95 - index)
-    #     normal_output = []
-    #     for i in range(index - 5, index + 6):
-    #         normal_output.append(normal_dist.pdf(i))
-    #     normal_output = torch.Tensor(normal_output)
-    #     output = torch.cat([leading_zeros, normal_output, trailing_zeros], dim = 0)
-    # elif index - 5 <= 0:
-    #     trailing_zeros = torch.zeros(95 - index)
-    #     normal_output = []
-    #     for i in range(0, index + 6):
-    #         normal_output.append(normal_dist.pdf(i))
-    #     normal_output = torch.Tensor(normal_output)
-    #     output = torch.cat([normal_output, trailing_zeros], dim = 0)
-    # elif index + 5 >= 100:
-    #     leading_zeros = torch.zeros(index - 5)
-    #     normal_output = []
-    #     for i in range(index - 5, 101):
-    #         normal_output.append(normal_dist.pdf(i))
-    #     normal_output = torch.Tensor(normal_output)
-    #     output = torch.cat([leading_zeros, normal_output], dim = 0)
 
     # Normalize output so that all valued add to 1
     output = output / torch.sum(output).item()
@@ -384,26 +383,26 @@ def custom_loss_bcg(output, labels, output_length = 101, sd = 5):
     loss = torch.mean((output - target) ** 2)
     return loss
 
-print(int_to_normal_tensor(20, sd = 1))
-
 """
 ==================================================
 ========== BEAUTY CONTEST GAME TRAINING ==========
 ==================================================
 """
 
-bs = 10
+bs = 30
 gs = 6
-hidden_size = 200
-num_layers = 15
+hidden_size = 250
+num_layers = 2
 bcg_net = generic_net(13, hidden_size, 101, num_layers = num_layers, bias = False)
-criterion = nn.CrossEntropyLoss()
-lr = 1
+lr = .1
 sd = 1
 network_efficiency = []
-epochs = []
 total_wins = 0
 total_rounds_played = 0
+
+# Counting number of parameters in large neural
+num_parameters = count_parameters(bcg_net)
+print("This network has {} million parameters.".format(round((num_parameters / 1000000), 2)))
 
 start = time.time()
 for epoch in range(1, 101):
@@ -423,24 +422,17 @@ for epoch in range(1, 101):
     net_guess_count = 0
 
     # Shuffle fictitious players to randomize training
-    # shuffle(bcg_players_0_7)
+    shuffle(bcg_players_0_7)
+    shuffle(bcg_players_0_9)
 
     # Create 'bs' number of groups (bs stands for "batch size")
-    # groups = []
-    # for i in range(0, bs * gs, gs):
-    #     # Initialize blank list for this particular random grouping of responders
-    #     group = []
-    #     for j in range(gs):
-    #         group.append(bcg_players_0_7[i + j])
-    #     groups.append(group)
-    if epoch % 2 == 0:
-        shuffle(real_human_groups_7)
-        groups = real_human_groups_7[:bs]
-        p_value = 0.7
-    else:
-        shuffle(real_human_groups_9)
-        groups = real_human_groups_9[:bs]
-        p_value = 0.9
+    groups = []
+    for i in range(0, bs * gs, gs):
+        # Initialize blank list for this particular random grouping of responders
+        group = []
+        for j in range(gs):
+            group.append(bcg_players_0_7[i + j])
+        groups.append(group)
 
     for round_number in range(10):
         # If it is the first round, set up first round histories
@@ -479,8 +471,7 @@ for epoch in range(1, 101):
         for group_idx in range(len(groups)):
             group = groups[group_idx]
             net_index = len(group)
-            group_guesses = [player.responses[round_number] for player in group]
-            # group_guesses = [player.respond(previous_winning_numbers[group_idx], round_number) for player in group]
+            group_guesses = [player.respond(previous_winning_numbers[group_idx], round_number) for player in group]
             total_guesses = np.array(group_guesses + [net_guesses[group_idx].item()])
             winning_number = np.mean(total_guesses) * p_value
             if abs(net_guesses[group_idx] - winning_number) < 5:
@@ -542,15 +533,233 @@ for epoch in range(1, 101):
     print('Close guesses: ', (100 * (within_5 / net_guess_count)), 'percent')
     print('')
     network_efficiency.append(within_5 / net_guess_count)
-    epochs.append(epoch)
-z = np.polyfit(epochs, network_efficiency, 5)
-f = np.poly1d(z)
-plt.plot(epochs, f(epochs), color = "r")
-plt.scatter(epochs, network_efficiency, color = "b")
-plt.show()
 
+
+
+
+"""
+===================================================
+======== TRAINING NETWORK ON HUMAN PLAYERS ========
+===================================================
+"""
+bs = 10
+hidden_size = 200
+num_layers = 15
+learning_rates = [1, .1, .05]
+sd = 1
+network_efficiency = []
+total_wins = 0
+total_rounds_played = 0
+
+# Counting number of parameters in large neural
+num_parameters = count_parameters(bcg_net)
+print("This network has {} million parameters.".format(round((num_parameters / 1000000), 2)))
+
+for lr in learning_rates:
+    lr_efficiency = []
+    bcg_net = generic_net(13, hidden_size, 101, num_layers = num_layers, bias = False)
+    start = time.time()
+    for epoch in range(1, 101):
+        # Learning schedule
+        if epoch % 25 == 0:
+            lr = lr / 5
+
+        # Setup optimizer
+        optimizer = optim.SGD(bcg_net.parameters(), lr = lr)
+
+        # Initialize descriptive stats to zeros
+        running_loss = 0
+        running_error = 0
+        num_batches = 0
+        epoch_wins = 0
+        within_5 = 0
+        net_guess_count = 0
+
+        # Alternate between training with p-value of 0.7 and p-value of 0.9
+        if epoch % 2 == 0:
+            shuffle(real_human_groups_7)
+            groups = real_human_groups_7[:bs]
+            p_value = 0.7
+        else:
+            shuffle(real_human_groups_9)
+            groups = real_human_groups_9[:bs]
+            p_value = 0.9
+
+        for round_number in range(10):
+            # If it is the first round, set up first round histories
+            if round_number == 0:
+                temp = torch.ones((3,))
+                p_values = temp.new_full((1, bs, 1), p_value)
+                previous_round_win = torch.zeros(1, bs, 1)
+                previous_round_guess = torch.zeros(1, bs, 1)
+                round_one_binary = torch.ones(1, bs, 1)
+                remaining_rounds = torch.zeros(1, bs, 9)
+                input_seq = torch.cat([p_values, previous_round_win, previous_round_guess, round_one_binary, remaining_rounds], dim = 2)
+                previous_winning_numbers = np.zeros(bs)
+
+            # Initialize network memory to zeros
+            h = torch.zeros(2 * num_layers, bs, hidden_size)
+            c = torch.zeros(2 * num_layers, bs, hidden_size)
+
+            # Detach prior gradient
+            h = h.detach()
+            c = c.detach()
+
+            # Begin tracking changes
+            h = h.requires_grad_()
+            c = c.requires_grad_()
+            input_seq = input_seq.requires_grad_()
+
+            # Clear prior gradient from network
+            optimizer.zero_grad()
+
+            # Send data through network
+            scores, (h, c) = bcg_net(input_seq, h, c)
+            net_guesses = scores.argmax(dim = 1)
+
+            # Setup minibatch labels (this part is a bit complicated in BCG)
+            minibatch_label = []
+            for group_idx in range(len(groups)):
+                group = groups[group_idx]
+                net_index = len(group)
+                group_guesses = [player.responses[round_number] for player in group]
+                total_guesses = np.array(group_guesses + [net_guesses[group_idx].item()])
+                winning_number = np.mean(total_guesses) * p_value
+                if abs(net_guesses[group_idx] - winning_number) < 5:
+                    within_5 += 1
+                net_guess_count += 1
+                total_rounds_played += 1
+                winning_number_idx = round(winning_number)
+                minibatch_label.append(winning_number_idx)
+                previous_winning_numbers[group_idx] = winning_number
+                if np.argmin(abs(total_guesses - winning_number)) == net_index:
+                    total_wins += 1
+                    epoch_wins += 1
+                    net_won = True
+                else:
+                    net_won = False
+            minibatch_label = torch.tensor(minibatch_label, dtype = torch.long)
+
+            # Compute loss
+            loss = custom_loss_bcg(scores, minibatch_label, sd = sd)
+
+            # Backward pass
+            loss.backward()
+
+            # Do one step of stochastic gradient descent
+            normalize_gradient(bcg_net)
+            optimizer.step()
+
+            # Update batch statistics
+            with torch.no_grad():
+                running_loss += loss.item()
+                error = get_error(scores, minibatch_label)
+                running_error += error
+                num_batches += 1
+
+            # Update input sequence to get it ready for next round
+            with torch.no_grad():
+                if round_number < 9:
+                    temp = torch.ones((3,))
+                    p_values = temp.new_full((1, bs, 1), p_value)
+                    previous_round_win = torch.zeros((1, bs, 1))
+                    previous_round_guess = torch.zeros((1, bs, 1))
+                    rounds_passed = torch.zeros(1, bs, round_number + 1)
+                    round_binary = torch.ones(1, bs, 1)
+                    if round_number < 8:
+                        rounds_remaining = torch.zeros(1, bs, 8 - round_number)
+                        input_seq = torch.cat([p_values, previous_round_win, previous_round_guess, rounds_passed, round_binary, rounds_remaining], dim = 2)
+                    else:
+                        input_seq = torch.cat([p_values, previous_round_win, previous_round_guess, rounds_passed, round_binary], dim = 2)
+
+        # At the end of each epoch, print summary statistics
+        elapsed = time.time() - start
+        avg_loss = running_loss / num_batches
+        avg_error = running_error / num_batches
+        print('')
+        print('| EPOCH {} |'.format(epoch))
+        print('='*len('| EPOCH {} |'.format(epoch)))
+        print('Error: ', '{}%'.format(avg_error * 100), '\t Loss: ', avg_loss, '\t Time: ', '{} minutes'.format(elapsed / 60))
+        print('Total wins this epoch: {} wins out of {} rounds played.'.format(epoch_wins, bs * 10))
+        print('Close guesses: ', (100 * (within_5 / net_guess_count)), 'percent')
+        print('')
+        lr_efficiency.append(within_5 / net_guess_count)
+    network_efficiency.append(lr_efficiency)
+
+# Save network efficiency data so it can be opened from a different file
 with open('Attempt to overfit real data.csv', 'w+', newline = '') as csvfile:
     csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(epochs)
-    csvwriter.writerow(network_efficiency)
-    
+    csvwriter.writerow(['Initial lr'] + list(range(100)))
+    for initial_lr, row in zip(learning_rates, network_efficiency):
+        csvwriter.writerow([initial_lr] + row)
+
+# Also save the data in a format that can better be analyzed in Stata
+csv_overfitting_data = np.array(listparse('Attempt to overfit real data.csv'))
+csv_overfitting_data = list(np.transpose(csv_overfitting_data))
+with open('Attempt to overfit real data - FOR STATA.csv', 'w+', newline = '') as csvfile:
+    csvwriter = csv.writer(csvfile)
+    for row in csv_overfitting_data:
+        csvwriter.writerow(row)
+
+"""
+===========================================================
+======== ANALYZING DECISIONS OF FICTITIOUS PLAYERS ========
+===========================================================
+"""
+
+# Setup lists with row headers to store responses of fictitious players,
+# sorted by round
+fictitious_responses_7 = [
+    ["round1", 0.7],
+    ["round2", 0.7],
+    ["round3", 0.7],
+    ["round4", 0.7],
+    ["round5", 0.7],
+    ["round6", 0.7],
+    ["round7", 0.7],
+    ["round8", 0.7],
+    ["round9", 0.7],
+    ["round10", 0.7]
+]
+fictitious_responses_9 = [
+    ["round1", 0.9],
+    ["round2", 0.9],
+    ["round3", 0.9],
+    ["round4", 0.9],
+    ["round5", 0.9],
+    ["round6", 0.9],
+    ["round7", 0.9],
+    ["round8",0.9],
+    ["round9", 0.9],
+    ["round10", 0.9]
+]
+
+# Randomly sample 2000 groups of 8 and play 10 rounds of BCG
+for i in range(2000):
+
+    shuffle(bcg_players_0_7)
+    shuffle(bcg_players_0_9)
+    group_7 = bcg_players_0_7[:7]
+    group_9 = bcg_players_0_9[:7]
+
+    previous_win_7 = 0
+    previous_win_9 = 0
+
+    for round_number in range(10):
+        guesses_7 = [round(player.respond(previous_win_7, round_number)) for player in group_7]
+        guesses_9 = [round(player.respond(previous_win_9, round_number)) for player in group_9]
+        fictitious_responses_7[round_number] += guesses_7
+        fictitious_responses_9[round_number] += guesses_9
+        guesses_7 = np.array(guesses_7)
+        guesses_9 = np.array(guesses_9)
+        previous_win_7 = 0.7 * np.mean(guesses_7)
+        previous_win_9 = 0.9 * np.mean(guesses_9)
+
+os.chdir(r"C:\Users\thehu\OneDrive\Documents\2019-2020\Thesis (Economics)\Beauty Contest Game data")
+
+with open('BCG - Fictitious Player Responses by Round.csv', 'w+', newline = '') as csvfile:
+    csvwriter = csv.writer(csvfile, skipinitialspace = True)
+    for row in fictitious_responses_7:
+        csvwriter.writerow(row)
+    for row in fictitious_responses_9:
+        csvwriter.writerow(row)

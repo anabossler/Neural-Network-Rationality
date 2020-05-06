@@ -1,3 +1,10 @@
+"""
+===================================================================================
+========== THIS SCRIPT IS FOR TRAINING THE NETWORK IN THE ULTIMATUM GAME ==========
+===================================================================================
+"""
+
+
 import numpy as np
 from scipy.stats import rv_continuous, kstest, gaussian_kde, ttest_1samp
 import os, csv, math, time

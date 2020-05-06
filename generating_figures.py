@@ -1,3 +1,9 @@
+"""
+===========================================================
+========== THIS SCRIPT IS FOR GENERATING FIGURES ==========
+===========================================================
+"""
+
 import os, csv, math
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -127,11 +133,11 @@ effectiveness = [0.0217, 0.0885, 0.3528, 0.6167]
 strategies = ('SPE', 'Smallest Nonzero\nOffer', 'Random Offer', 'Trained Network')
 x = np.arange(4)
 
-fig, axs = plt.subplots(1, 1, figsize = (10, 10))
+fig, axs = plt.subplots(1, 1, figsize = (7, 7))
 axs.yaxis.set_major_formatter(y_formatter)
-axs.bar(x, effectiveness)
+axs.bar(x, effectiveness, ec = "b", fc = "#ccddff")
 plt.xticks(x, strategies)
-plt.ylabel('Efficiency (% of possible earnings captured)')
+plt.ylabel('Efficiency (% of possible earnings captured)', size = 'large')
 plt.savefig('Relative Efficiency of Different Strategies.png')
 
 """
@@ -203,7 +209,7 @@ for entry in human_data:
 BINS = list(range(21))
 BINS = [round(x * 0.05, 2) for x in BINS]
 
-fig, axs = plt.subplots(2, 5, sharex = True, sharey = True, figsize = (30, 12))
+fig, axs = plt.subplots(2, 5, sharex = True, sharey = True, figsize = (22.5, 9))
 colnames = ['1', '2', '3', '4', '5']
 padding = 5
 for ax, col in zip(axs[0], colnames):
@@ -249,7 +255,7 @@ plt.savefig('Net vs. Humans (rounds 1-5) - 4-2-20.png')
 # Now for rounds 6-10:
 os.chdir(r"C:\Users\thehu\OneDrive\Documents\2019-2020\Thesis (Economics)")
 
-fig, axs = plt.subplots(2, 5, sharex = True, sharey = True, figsize = (30, 12))
+fig, axs = plt.subplots(2, 5, sharex = True, sharey = True, figsize = (22.5, 9))
 colnames = ['6', '7', '8', '9', '10']
 padding = 5
 for ax, col in zip(axs[0], colnames):
@@ -288,3 +294,156 @@ for round_number in range(5, 10):
 
 os.chdir(r"C:\Users\thehu\OneDrive\Documents\2019-2020\Thesis (Economics)\Figures")
 plt.savefig('Net vs. Humans (rounds 6-10) - 4-2-20.png')
+
+
+"""
+Figure for comparing BCG fictitious player responses to BCG human responses.
+"""
+os.chdir(r"C:\Users\thehu\OneDrive\Documents\2019-2020\Thesis (Economics)\Beauty Contest Game data")
+
+fictitious_responses = listparse('BCG - Fictitious Player Responses by Round.csv')
+human_responses = listparse('BCG - Human Responses by Round.csv')
+fictitious_data_7 = []
+fictitious_data_9 = []
+human_data_7 = []
+human_data_9 = []
+for dataset in fictitious_responses:
+    p_value = float(dataset[1])
+    new_dataset = [float(datapoint) for datapoint in dataset[2:]]
+    if p_value == 0.7:
+        fictitious_data_7.append(new_dataset)
+    else:
+        fictitious_data_9.append(new_dataset)
+for dataset in human_responses:
+    p_value = float(dataset[1])
+    new_dataset = [float(datapoint) for datapoint in dataset[2:]]
+    if p_value ==0.7:
+        human_data_7.append(new_dataset)
+    else:
+        human_data_9.append(new_dataset)
+print(len(fictitious_data_7))
+
+fig, axs = plt.subplots(2, 5, sharex = True, sharey = True, figsize = (22.5, 9))
+colnames = ['6', '7', '8', '9', '10']
+padding = 5
+for ax, col in zip(axs[0], colnames):
+    ax.annotate(
+        col, xy = (0.5, 1), xytext = (0, padding),
+        xycoords = 'axes fraction', textcoords = 'offset points',
+        size = 'x-large', ha = 'center', va = 'baseline'
+    )
+axs[0][2].annotate(
+    'Round Number', xy = (0.5, 1), xytext = (0, 25),
+    xycoords = 'axes fraction', textcoords = 'offset points',
+    size = 'xx-large', ha = 'center', va = 'baseline'
+)
+axs[1][2].annotate(
+    'Distribution of Guesses', xy = (0.5, 0), xytext = (0, -axs[1][2].xaxis.labelpad - (3 * padding)),
+    xycoords = axs[1][2].xaxis.label, textcoords = 'offset points',
+    size = 'xx-large', ha = 'center', va = 'baseline'
+)
+rownames = ['Human Players', 'Fictitious Players']
+for ax, row in zip(axs[:,0], rownames):
+    ax.annotate(
+        row, xy = (0, 0.5), xytext = (-padding, 0),
+        xycoords = ax.yaxis.label, textcoords = 'offset points',
+        size = 'x-large', ha = 'right', va = 'center', rotation = 'vertical'
+    )
+
+BINS = list(range(21))
+BINS = [5*x for x in BINS]
+
+for round_number in range(5, 10):
+    axs[0, round_number - 5].hist(human_data_9[round_number], density = True, ec = "#ff9900", fc = "#ffebcc", bins = BINS)
+    axs[1, round_number - 5].hist(fictitious_data_9[round_number], density = True, ec = "b", fc = "#ccddff", bins = BINS)
+
+os.chdir(r"C:\Users\thehu\OneDrive\Documents\2019-2020\Thesis (Economics)\Figures")
+
+plt.savefig('Fic players vs humans, p-value 0.9, rounds 6-10.png')
+
+"""
+Generating figure to plot average guess round over round for fictitious players vs
+human players.
+"""
+# First, find average guess each round for both fictitious players and human players
+fictitious_average_7 = []
+fictitious_average_9 = []
+human_average_7 = []
+human_average_9 = []
+
+for round_number in range(10):
+    fictitious_average_7.append(np.mean(np.array(fictitious_data_7[round_number])))
+    fictitious_average_9.append(np.mean(np.array(fictitious_data_9[round_number])))
+    human_average_7.append(np.mean(np.array(human_data_7[round_number])))
+    human_average_9.append(np.mean(np.array(human_data_9[round_number])))
+
+round_numbers = np.arange(10) + 1
+
+fig, axs = plt.subplots(1, 2, sharex = True, sharey = True, figsize = (12, 5))
+
+axs[0].annotate(
+    "Average Guess", xy = (0, 0.5), xytext = (-padding, 0),
+    xycoords = axs[0].yaxis.label, textcoords = 'offset points',
+    size = 'x-large', ha = 'center', va = 'center', rotation = 'vertical'
+)
+
+axs[0].annotate(
+    "Round Number", xy = (1, 0), xytext = (85, -30),
+    xycoords = 'axes fraction', textcoords = 'offset points',
+    size = 'x-large', ha = 'right', va = 'baseline'
+)
+
+colnames = ['P-value = 0.7', 'P-value = 0.9']
+padding = 5
+for ax, col in zip(axs, colnames):
+    ax.annotate(
+        col, xy = (0.5, 1), xytext = (0, padding),
+        xycoords = 'axes fraction', textcoords = 'offset points',
+        size = 'x-large', ha = 'center', va = 'baseline'
+    )
+
+axs[0].plot(round_numbers, fictitious_average_7, 'b')
+axs[0].plot(round_numbers, human_average_7, '#ff9900')
+axs[1].plot(round_numbers, fictitious_average_9, 'b')
+axs[1].plot(round_numbers, human_average_9, '#ff9900')
+plt.ylim(0, 60)
+
+blue_patch = mpatches.Patch(color = "b", label = "Fictitious Players")
+orange_patch = mpatches.Patch(color = "#ff9900", label = "Human Players")
+plt.legend(handles = [blue_patch, orange_patch], loc = 'lower right')
+
+plt.savefig('Average guesses fic players vs human players.png')
+
+
+"""
+Plot network efficiency of BCG net when attempting to overfit the training data.
+"""
+# Load data
+os.chdir(r"C:\Users\thehu\OneDrive\Documents\2019-2020\Thesis (Economics)\Beauty Contest Game data")
+overfitting_data = listparse('Attempt to overfit real data.csv')
+
+# Format data as floats (or integers for epoch numbers)
+overfitting_data[0] = [overfitting_data[0][0]] + [int(x) for x in overfitting_data[0][1:]]
+for i in range(1, 4):
+    overfitting_data[i] = [float(x) for x in overfitting_data[i]]
+
+fig, axs = plt.subplots(1, 1, sharex = True, sharey = True, figsize = (8, 6))
+epochs = overfitting_data[0][1:]
+colors = ['#ff3300', '#009900', '#0066ff']
+scatter_colors = ["#ffc2b3", "#80ff80", "#cce0ff"]
+for i in range(1, 4):
+    z = np.polyfit(epochs, overfitting_data[i][1:], 5)
+    f = np.poly1d(z)
+    axs.scatter(epochs, overfitting_data[i][1:], color = scatter_colors[i - 1])
+    axs.plot(epochs, f(epochs), color = colors[i - 1])
+
+plt.xlabel('Epoch Number', size = 'large')
+plt.ylabel('Network Efficiency (% of close guesses)', size = 'large')
+
+red_patch = mpatches.Patch(color = "#ff3300", label = "1.0")
+green_patch = mpatches.Patch(color = "#009900", label = "0.1")
+blue_patch = mpatches.Patch(color = "#0066ff", label = "0.05")
+plt.legend(handles = [red_patch, green_patch, blue_patch], loc = 'lower right', title = "Initial learning rate")
+
+os.chdir(r"C:\Users\thehu\OneDrive\Documents\2019-2020\Thesis (Economics)\Figures")
+plt.savefig('Attempt to overfit data.png')
